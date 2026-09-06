@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Athenaeum — A Personal Library</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#ece5d6;--panel:#f7f2e7;--ink:#2a2420;--muted:#6b6152;--line:#d8cbb0;
+  --chemistry:#1f7a6c;--physics:#2c5f8a;--biology:#3f7d42;--maths:#55506b;
+  --motivational:#c1611d;--religion:#8a6a2f;--art:#96316b;--commerce:#2f5d4e;--everyday:#a2492f;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:'IBM Plex Sans',sans-serif;line-height:1.55;
+}
+header{
+  max-width:920px;margin:0 auto;padding:56px 24px 28px;
+}
+header h1{
+  font-family:'Source Serif 4',serif;font-weight:700;font-size:clamp(2.2rem,5vw,3.1rem);
+  margin:0 0 6px;letter-spacing:-.01em;
+}
+header p{margin:0 0 26px;color:var(--muted);font-size:1.02rem;max-width:52ch}
+#searchBox{
+  width:100%;max-width:440px;padding:12px 16px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);color:var(--ink);font-family:inherit;font-size:1rem;
+}
+#searchBox:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+main{max-width:920px;margin:0 auto;padding:0 24px 80px}
+.shelf{margin-top:44px}
+.shelf h2{
+  font-family:'Source Serif 4',serif;font-weight:600;font-size:1.5rem;margin:0 0 4px;
+  color:var(--subject-color);
+}
+.shelf .rule{height:3px;background:var(--subject-color);width:52px;border-radius:2px;margin-bottom:18px}
+.entry{
+  display:grid;grid-template-columns:36px 1fr auto;gap:16px;align-items:start;
+  padding:14px 0;border-bottom:1px solid var(--line);
+}
+.entry:last-child{border-bottom:0}
+.entry .num{
+  font-family:'Source Serif 4',serif;font-weight:600;color:var(--subject-color);font-size:1.05rem;
+  padding-top:2px;
+}
+.entry .info h3{margin:0 0 4px;font-size:1.05rem;font-weight:600}
+.entry .info p{margin:0;color:var(--muted);font-size:.92rem;max-width:58ch}
+.entry a.action{
+  align-self:center;white-space:nowrap;font-weight:600;font-size:.92rem;color:var(--subject-color);
+  text-decoration:none;border-bottom:2px solid var(--subject-color);padding-bottom:1px;
+}
+.entry a.action:hover,.entry a.action:focus-visible{opacity:.75}
+.entry a.action:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.empty-note{color:var(--muted);font-style:italic;padding:10px 0}
+footer{max-width:920px;margin:0 auto;padding:0 24px 60px;color:var(--muted);font-size:.88rem}
+footer a{color:var(--ink)}
+@media(max-width:600px){
+  header{padding:40px 18px 20px}
+  main{padding:0 18px 60px}
+  .entry{grid-template-columns:26px 1fr;grid-template-areas:"num info" ". action"}
+  .entry .num{grid-area:num}
+  .entry .info{grid-area:info}
+  .entry a.action{grid-area:action;justify-self:start;margin-top:6px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Athenaeum</h1>
+  <p>A personal library, organised by subject. Search across every shelf, or browse one at a time.</p>
+  <input type="search" id="searchBox" placeholder="Search titles or descriptions…" aria-label="Search the library">
+</header>
+
+<main id="shelves"></main>
+
+<footer>
+  Built with a plain HTML/CSS/JS page hosted on GitHub Pages. This page lists whatever files are in your subject folders automatically — set your GitHub username and repo name once near the top of the script, then just drop files into folders.
+</footer>
+
+<script>
+/*
+  HOW TO ADD A BOOK
+  ------------------
+  Just drop the file into the matching subject folder in your GitHub repo —
+  e.g. put "reaction-mechanics.pdf" inside the "chemistry" folder.
+  This page reads that folder list live from GitHub every time it loads,
+  so the book appears automatically. No code editing required.
+
+  The title shown is generated from the filename (dashes/underscores become
+  spaces, each word capitalised), so name your files accordingly —
+  e.g. "reaction-mechanics.pdf" becomes "Reaction Mechanics".
+*/
+
+/*
+  ONE-TIME SETUP
+  --------------
+  Fill in your GitHub username and repository name below.
+  After that, this page automatically lists whatever files you drop into
+  each subject folder — no editing required, ever.
+*/
+const GITHUB_USER="themultiplierfx";
+const GITHUB_REPO="TM_FX_LIBRARY";
+
+const SUBJECTS={
+  "Chemistry":{color:"--chemistry",folder:"chemistry"},
+  "Physics":{color:"--physics",folder:"physics"},
+  "Biology":{color:"--biology",folder:"biology"},
+  "Maths":{color:"--maths",folder:"maths"},
+  "Motivational":{color:"--motivational",folder:"motivational"},
+  "Religion":{color:"--religion",folder:"religion"},
+  "Art":{color:"--art",folder:"art"},
+  "Commerce":{color:"--commerce",folder:"commerce"},
+  "Everyday Life":{color:"--everyday",folder:"everyday-life"}
+};
+
+function prettifyFilename(name){
+  const base=name.replace(/\.[^.]+$/,"");
+  return base.replace(/[-_]+/g," ").replace(/\s+/g," ").trim()
+    .replace(/\b\w/g,c=>c.toUpperCase());
+}
+function actionLabelFor(name){
+  const ext=(name.split(".").pop()||"").toLowerCase();
+  if(ext==="pdf"||ext==="html"||ext==="htm")return "Read";
+  return "Download";
+}
+async function fetchFolderBooks(subject,folder){
+  const url=`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${encodeURIComponent(folder)}`;
+  try{
+    const res=await fetch(url);
+    if(res.status===404)return {books:[],error:null}; // folder doesn't exist yet — just show nothing for it
+    if(!res.ok)return {books:[],error:"Could not load this shelf right now (GitHub responded with "+res.status+")."};
+    const items=await res.json();
+    if(!Array.isArray(items))return {books:[],error:null};
+    const files=items.filter(it=>it.type==="file" && !/^\./.test(it.name));
+    return {books:files.map(f=>({
+      subject,title:prettifyFilename(f.name),
+      blurb:f.name,
+      file:f.path,
+      action:actionLabelFor(f.name)
+    })),error:null};
+  }catch(err){
+    console.error(err);
+    return {books:[],error:"Could not reach GitHub to load this shelf. Check your internet connection."};
+  }
+}
+
+let allBooks=[];
+async function loadAllShelves(){
+  const container=document.getElementById("shelves");
+  container.innerHTML=`<p class="empty-note">Loading your shelves from GitHub…</p>`;
+  const results=await Promise.all(
+    Object.entries(SUBJECTS).map(([subject,cfg])=>fetchFolderBooks(subject,cfg.folder))
+  );
+  allBooks=[];
+  const errors=[];
+  Object.keys(SUBJECTS).forEach((subject,i)=>{
+    allBooks=allBooks.concat(results[i].books);
+    if(results[i].error)errors.push(subject+": "+results[i].error);
+  });
+  renderShelves("");
+  if(errors.length){
+    const note=document.createElement("p");
+    note.className="empty-note";
+    note.textContent=errors.join(" ");
+    document.getElementById("shelves").appendChild(note);
+  }
+}
+
+function renderShelves(filter){
+  const container=document.getElementById("shelves");
+  container.innerHTML="";
+  const q=(filter||"").trim().toLowerCase();
+  let anyVisible=false;
+
+  Object.keys(SUBJECTS).forEach(subject=>{
+    const entries=allBooks.filter(b=>b.subject===subject &&
+      (!q || b.title.toLowerCase().includes(q)));
+    if(!entries.length)return;
+    anyVisible=true;
+
+    const section=document.createElement("section");
+    section.className="shelf";
+    section.style.setProperty("--subject-color",`var(${SUBJECTS[subject].color})`);
+
+    const h2=document.createElement("h2");h2.textContent=subject;
+    const rule=document.createElement("div");rule.className="rule";
+    section.appendChild(h2);section.appendChild(rule);
+
+    entries.forEach((b,i)=>{
+      const row=document.createElement("div");row.className="entry";
+      row.innerHTML=`
+        <div class="num">${String(i+1).padStart(2,"0")}</div>
+        <div class="info"><h3>${escapeHTML(b.title)}</h3></div>
+        <a class="action" href="${encodeURI(b.file)}" target="_blank" rel="noopener">${escapeHTML(b.action||"Read")}</a>
+      `;
+      section.appendChild(row);
+    });
+    container.appendChild(section);
+  });
+
+  if(!anyVisible){
+    const note=document.createElement("p");
+    note.className="empty-note";
+    note.textContent=q?`No books match "${filter}".`:"No books found yet — drop a file into one of your subject folders on GitHub and refresh this page.";
+    container.appendChild(note);
+  }
+}
+function escapeHTML(s){
+  const d=document.createElement("div");d.textContent=s;return d.innerHTML;
+}
+
+document.getElementById("searchBox").addEventListener("input",e=>renderShelves(e.target.value));
+loadAllShelves();
+</script>
+</body>
+</html>
